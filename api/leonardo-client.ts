@@ -288,9 +288,18 @@ export interface DownloadedImage {
 }
 
 /**
- * Download an image from a URL and return it as base64
+ * Download an image from a URL and return it as base64.
+ * The base64 data IS the raw image bytes — decode and save with the
+ * correct extension (.jpg, .png, .webp) based on the returned mimeType.
+ *
+ * If `asJpeg` is true, the file is always returned with image/jpeg MIME
+ * regardless of source format. Leonardo images are already JPEG in almost
+ * all cases, so this simply ensures the metadata matches.
  */
-export async function downloadImage(imageUrl: string): Promise<DownloadedImage> {
+export async function downloadImage(
+  imageUrl: string,
+  asJpeg: boolean = false,
+): Promise<DownloadedImage> {
   const res = await fetch(imageUrl);
 
   if (!res.ok) {
@@ -303,13 +312,53 @@ export async function downloadImage(imageUrl: string): Promise<DownloadedImage> 
 
   // Extract filename from URL
   const urlPath = new URL(imageUrl).pathname;
-  const filename = urlPath.split("/").pop() ?? "image.jpg";
+  let filename = urlPath.split("/").pop() ?? "image.jpg";
+
+  let mimeType = contentType;
+
+  if (asJpeg) {
+    mimeType = "image/jpeg";
+    // Ensure filename ends with .jpg
+    filename = filename.replace(/\.[^.]+$/, ".jpg");
+    if (!filename.endsWith(".jpg")) filename += ".jpg";
+  }
+
+  return {
+    base64,
+    mimeType,
+    filename,
+    url: imageUrl,
+  };
+}
+
+/**
+ * Download a video (MP4) from a URL and return it as base64.
+ */
+export async function downloadVideo(videoUrl: string): Promise<{
+  base64: string;
+  mimeType: string;
+  filename: string;
+  url: string;
+}> {
+  const res = await fetch(videoUrl);
+
+  if (!res.ok) {
+    throw new Error(`Failed to download video: ${res.status} ${res.statusText}`);
+  }
+
+  const contentType = res.headers.get("content-type") ?? "video/mp4";
+  const buffer = await res.arrayBuffer();
+  const base64 = Buffer.from(buffer).toString("base64");
+
+  const urlPath = new URL(videoUrl).pathname;
+  let filename = urlPath.split("/").pop() ?? "video.mp4";
+  if (!filename.endsWith(".mp4")) filename += ".mp4";
 
   return {
     base64,
     mimeType: contentType,
     filename,
-    url: imageUrl,
+    url: videoUrl,
   };
 }
 
@@ -360,4 +409,53 @@ export async function waitForGeneration(
 
   // Return last status even if not complete
   return getGenerationById(apiKey, generationId);
+}
+
+// ─── Motion / Video Generation ─────────────────────────────────
+
+export interface CreateMotionGenerationParams {
+  imageId: string;
+  isPublic?: boolean;
+  isInitImage?: boolean;
+  motionStrength?: number; // 1-10
+}
+
+/**
+ * Create a motion generation (image → video) using Leonardo's
+ * Motion SVD endpoint.
+ *
+ * POST /generations-motion-svd
+ */
+export async function createMotionGeneration(
+  apiKey: string,
+  params: CreateMotionGenerationParams,
+): Promise<{ motionSvdGenerationId: string }> {
+  const body: Record<string, unknown> = {
+    imageId: params.imageId,
+  };
+  if (params.isPublic !== undefined) body.isPublic = params.isPublic;
+  if (params.isInitImage !== undefined) body.isInitImage = params.isInitImage;
+  if (params.motionStrength !== undefined) body.motionStrength = params.motionStrength;
+
+  const data = await request(apiKey, "POST", "/generations-motion-svd", body);
+  return {
+    motionSvdGenerationId:
+      data.motionSvdGenerationJob?.generationId ??
+      data.motionSvdGenerationId ??
+      data.generationId ??
+      data.id,
+  };
+}
+
+/**
+ * Poll a motion generation until complete. The resulting generation's
+ * `generated_images` entries will have `motionMP4URL` populated.
+ */
+export async function waitForMotionGeneration(
+  apiKey: string,
+  generationId: string,
+  maxWaitMs: number = 60000,
+  pollIntervalMs: number = 3000,
+): Promise<Generation> {
+  return waitForGeneration(apiKey, generationId, maxWaitMs, pollIntervalMs);
 }

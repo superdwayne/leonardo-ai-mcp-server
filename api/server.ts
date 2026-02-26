@@ -12,6 +12,9 @@ import {
   waitForGeneration,
   downloadImage,
   downloadGenerationImages,
+  downloadVideo,
+  createMotionGeneration,
+  waitForMotionGeneration,
 } from "./leonardo-client.js";
 
 /**
@@ -467,16 +470,21 @@ const handler = createMcpHandler(
     // ── Tool: download_image ────────────────────────────────────
     server.tool(
       "download_image",
-      "Download a Leonardo AI generated image by its URL. Returns the image as base64 data that can be saved locally. Use this after generate_image to get the actual image file.",
+      "Download a Leonardo AI generated image by its URL. Returns the image as base64 data (JPEG by default) that can be decoded and saved locally as a .jpg file. Use this after generate_image to get the actual image file.",
       {
         image_url: z
           .string()
           .url()
           .describe("The URL of the image to download (from generate_image or get_generation results)"),
+        as_jpeg: z
+          .boolean()
+          .optional()
+          .describe("Force output as JPEG format with .jpg filename (default: true). Set to false to keep original format."),
       },
-      async ({ image_url }: { image_url: string }, _extra: unknown) => {
+      async ({ image_url, as_jpeg }: { image_url: string; as_jpeg?: boolean }, _extra: unknown) => {
         try {
-          const image = await downloadImage(image_url);
+          const asJpeg = as_jpeg !== false; // default true
+          const image = await downloadImage(image_url, asJpeg);
           return {
             content: [
               {
@@ -490,8 +498,10 @@ const handler = createMcpHandler(
                   {
                     filename: image.filename,
                     mimeType: image.mimeType,
+                    format: asJpeg ? "jpeg" : "original",
                     url: image.url,
                     sizeBytes: Math.round((image.base64.length * 3) / 4),
+                    instructions: `Decode the base64 data and save as "${image.filename}" to get a valid ${asJpeg ? "JPEG" : image.mimeType.split("/")[1]} file.`,
                   },
                   null,
                   2,
@@ -560,6 +570,163 @@ const handler = createMcpHandler(
           });
 
           return { content };
+        } catch (err: unknown) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: ${(err as Error).message}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      },
+    );
+
+    // ── Tool: create_motion_generation ─────────────────────────
+    server.tool(
+      "create_motion_generation",
+      "Generate a short video (motion) from an existing Leonardo AI image. Takes an image ID and produces an MP4 video using Leonardo's Motion SVD. Polls for completion (up to 60s). The result includes motionMP4URL for the video.",
+      {
+        image_id: z
+          .string()
+          .describe(
+            "The ID of a generated image to animate (from generate_image results, use the image ID not generation ID)",
+          ),
+        motion_strength: z
+          .number()
+          .int()
+          .min(1)
+          .max(10)
+          .optional()
+          .describe("Motion intensity from 1 (subtle) to 10 (strong). Default: 5"),
+        is_public: z
+          .boolean()
+          .optional()
+          .describe("Whether the motion generation should be public (default: false)"),
+        wait_for_completion: z
+          .boolean()
+          .optional()
+          .describe(
+            "Whether to poll and wait for the motion generation to complete (default: true, max 60s)",
+          ),
+      },
+      async (
+        params: {
+          image_id: string;
+          motion_strength?: number;
+          is_public?: boolean;
+          wait_for_completion?: boolean;
+        },
+        extra: unknown,
+      ) => {
+        const apiKey = extractApiKey(extra);
+        try {
+          const { motionSvdGenerationId } = await createMotionGeneration(apiKey, {
+            imageId: params.image_id,
+            motionStrength: params.motion_strength,
+            isPublic: params.is_public,
+          });
+
+          const shouldWait = params.wait_for_completion !== false;
+
+          if (shouldWait) {
+            const generation = await waitForMotionGeneration(
+              apiKey,
+              motionSvdGenerationId,
+            );
+
+            const videoUrls = generation.generated_images
+              ?.map((img) => img.motionMP4URL)
+              .filter(Boolean);
+
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: JSON.stringify(
+                    {
+                      generationId: generation.id,
+                      status: generation.status,
+                      motionVideos: videoUrls ?? [],
+                      imageDetails: generation.generated_images ?? [],
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+            };
+          }
+
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify(
+                  {
+                    motionSvdGenerationId,
+                    status: "PENDING",
+                    message:
+                      "Motion generation started. Use get_generation to check status and get the motionMP4URL.",
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        } catch (err: unknown) {
+          const error = err as Error & { body?: unknown };
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: ${error.message}${error.body ? "\n" + JSON.stringify(error.body, null, 2) : ""}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      },
+    );
+
+    // ── Tool: download_video ─────────────────────────────────────
+    server.tool(
+      "download_video",
+      "Download a Leonardo AI motion video (MP4) by its URL. Returns the video as base64 data that can be decoded and saved as an .mp4 file. Use this after create_motion_generation to get the video file.",
+      {
+        video_url: z
+          .string()
+          .url()
+          .describe(
+            "The URL of the motion video to download (motionMP4URL from generation results)",
+          ),
+      },
+      async ({ video_url }: { video_url: string }, _extra: unknown) => {
+        try {
+          const video = await downloadVideo(video_url);
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify(
+                  {
+                    filename: video.filename,
+                    mimeType: video.mimeType,
+                    format: "mp4",
+                    url: video.url,
+                    sizeBytes: Math.round((video.base64.length * 3) / 4),
+                    base64: video.base64,
+                    instructions: `Decode the base64 data and save as "${video.filename}" to get a valid MP4 video file.`,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
         } catch (err: unknown) {
           return {
             content: [
