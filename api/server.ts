@@ -30,6 +30,13 @@ function getApiKey(headers?: Record<string, string>): string {
   );
 }
 
+function extractApiKey(extra: unknown): string {
+  const headers = (extra as Record<string, any>)?.requestInfo?.headers as
+    | Record<string, string>
+    | undefined;
+  return getApiKey(headers);
+}
+
 // ─── MCP Server ─────────────────────────────────────────────────
 
 const handler = createMcpHandler(
@@ -39,10 +46,8 @@ const handler = createMcpHandler(
       "get_user_info",
       "Get the current authenticated Leonardo AI user's information including username, subscription tokens, and API quota.",
       {},
-      async (_params, extra) => {
-        const apiKey = getApiKey(
-          (extra as any)?.requestInfo?.headers as Record<string, string>,
-        );
+      async (_params: Record<string, never>, extra: unknown) => {
+        const apiKey = extractApiKey(extra);
         try {
           const user = await getUserInfo(apiKey);
           return {
@@ -53,12 +58,12 @@ const handler = createMcpHandler(
               },
             ],
           };
-        } catch (err: any) {
+        } catch (err: unknown) {
           return {
             content: [
               {
                 type: "text" as const,
-                text: `Error: ${err.message}`,
+                text: `Error: ${(err as Error).message}`,
               },
             ],
             isError: true,
@@ -72,10 +77,8 @@ const handler = createMcpHandler(
       "list_models",
       "List all available Leonardo AI platform models. Returns model IDs, names, and descriptions. Use the model ID when generating images.",
       {},
-      async (_params, extra) => {
-        const apiKey = getApiKey(
-          (extra as any)?.requestInfo?.headers as Record<string, string>,
-        );
+      async (_params: Record<string, never>, extra: unknown) => {
+        const apiKey = extractApiKey(extra);
         try {
           const models = await listPlatformModels(apiKey);
           const summary = models.map((m) => ({
@@ -91,12 +94,12 @@ const handler = createMcpHandler(
               },
             ],
           };
-        } catch (err: any) {
+        } catch (err: unknown) {
           return {
             content: [
               {
                 type: "text" as const,
-                text: `Error: ${err.message}`,
+                text: `Error: ${(err as Error).message}`,
               },
             ],
             isError: true,
@@ -174,10 +177,22 @@ const handler = createMcpHandler(
             "Whether to poll and wait for the generation to complete (default: true, max 30s)",
           ),
       },
-      async (params, extra) => {
-        const apiKey = getApiKey(
-          (extra as any)?.requestInfo?.headers as Record<string, string>,
-        );
+      async (params: {
+        prompt: string;
+        model_id?: string;
+        negative_prompt?: string;
+        width?: number;
+        height?: number;
+        num_images?: number;
+        guidance_scale?: number;
+        seed?: number;
+        alchemy?: boolean;
+        photo_real?: boolean;
+        preset_style?: string;
+        ultra?: boolean;
+        wait_for_completion?: boolean;
+      }, extra: unknown) => {
+        const apiKey = extractApiKey(extra);
         try {
           const { generationId } = await createGeneration(apiKey, {
             prompt: params.prompt,
@@ -241,12 +256,13 @@ const handler = createMcpHandler(
               },
             ],
           };
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const error = err as Error & { body?: unknown };
           return {
             content: [
               {
                 type: "text" as const,
-                text: `Error: ${err.message}${err.body ? "\n" + JSON.stringify(err.body, null, 2) : ""}`,
+                text: `Error: ${error.message}${error.body ? "\n" + JSON.stringify(error.body, null, 2) : ""}`,
               },
             ],
             isError: true,
@@ -264,10 +280,8 @@ const handler = createMcpHandler(
           .string()
           .describe("The generation job ID to look up"),
       },
-      async ({ generation_id }, extra) => {
-        const apiKey = getApiKey(
-          (extra as any)?.requestInfo?.headers as Record<string, string>,
-        );
+      async ({ generation_id }: { generation_id: string }, extra: unknown) => {
+        const apiKey = extractApiKey(extra);
         try {
           const generation = await getGenerationById(apiKey, generation_id);
           return {
@@ -278,12 +292,12 @@ const handler = createMcpHandler(
               },
             ],
           };
-        } catch (err: any) {
+        } catch (err: unknown) {
           return {
             content: [
               {
                 type: "text" as const,
-                text: `Error: ${err.message}`,
+                text: `Error: ${(err as Error).message}`,
               },
             ],
             isError: true,
@@ -316,10 +330,8 @@ const handler = createMcpHandler(
           .optional()
           .describe("Offset for pagination (default: 0)"),
       },
-      async ({ user_id, limit, offset }, extra) => {
-        const apiKey = getApiKey(
-          (extra as any)?.requestInfo?.headers as Record<string, string>,
-        );
+      async ({ user_id, limit, offset }: { user_id: string; limit?: number; offset?: number }, extra: unknown) => {
+        const apiKey = extractApiKey(extra);
         try {
           const generations = await getGenerationsByUserId(
             apiKey,
@@ -343,12 +355,12 @@ const handler = createMcpHandler(
               },
             ],
           };
-        } catch (err: any) {
+        } catch (err: unknown) {
           return {
             content: [
               {
                 type: "text" as const,
-                text: `Error: ${err.message}`,
+                text: `Error: ${(err as Error).message}`,
               },
             ],
             isError: true,
@@ -374,10 +386,8 @@ const handler = createMcpHandler(
             "The type of transformation to apply (default: variation)",
           ),
       },
-      async ({ image_id, transform_type }, extra) => {
-        const apiKey = getApiKey(
-          (extra as any)?.requestInfo?.headers as Record<string, string>,
-        );
+      async ({ image_id, transform_type }: { image_id: string; transform_type?: "OUTPAINT" | "INPAINT" | "UPSCALE" | "UNZOOM" }, extra: unknown) => {
+        const apiKey = extractApiKey(extra);
         try {
           const result = await createVariation(apiKey, {
             id: image_id,
@@ -392,12 +402,12 @@ const handler = createMcpHandler(
               },
             ],
           };
-        } catch (err: any) {
+        } catch (err: unknown) {
           return {
             content: [
               {
                 type: "text" as const,
-                text: `Error: ${err.message}`,
+                text: `Error: ${(err as Error).message}`,
               },
             ],
             isError: true,
@@ -423,10 +433,8 @@ const handler = createMcpHandler(
           .optional()
           .describe("Upscale multiplier (e.g. 2 for 2x resolution)"),
       },
-      async ({ image_id, upscale_multiplier }, extra) => {
-        const apiKey = getApiKey(
-          (extra as any)?.requestInfo?.headers as Record<string, string>,
-        );
+      async ({ image_id, upscale_multiplier }: { image_id: string; upscale_multiplier?: number }, extra: unknown) => {
+        const apiKey = extractApiKey(extra);
         try {
           const result = await upscaleImage(apiKey, {
             id: image_id,
@@ -440,12 +448,12 @@ const handler = createMcpHandler(
               },
             ],
           };
-        } catch (err: any) {
+        } catch (err: unknown) {
           return {
             content: [
               {
                 type: "text" as const,
-                text: `Error: ${err.message}`,
+                text: `Error: ${(err as Error).message}`,
               },
             ],
             isError: true,
@@ -463,10 +471,8 @@ const handler = createMcpHandler(
           .string()
           .describe("The generation ID to delete"),
       },
-      async ({ generation_id }, extra) => {
-        const apiKey = getApiKey(
-          (extra as any)?.requestInfo?.headers as Record<string, string>,
-        );
+      async ({ generation_id }: { generation_id: string }, extra: unknown) => {
+        const apiKey = extractApiKey(extra);
         try {
           await deleteGeneration(apiKey, generation_id);
           return {
@@ -477,12 +483,12 @@ const handler = createMcpHandler(
               },
             ],
           };
-        } catch (err: any) {
+        } catch (err: unknown) {
           return {
             content: [
               {
                 type: "text" as const,
-                text: `Error: ${err.message}`,
+                text: `Error: ${(err as Error).message}`,
               },
             ],
             isError: true,
