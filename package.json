@@ -1,0 +1,30 @@
+{
+  "name": "leonardo-ai-mcp-server",
+  "version": "1.0.0",
+  "description": "Remote MCP server for Leonardo.ai image generation platform, powered by Vercel",
+  "main": "api/server.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "leonardo-ai",
+    "image-generation",
+    "vercel",
+    "model-context-protocol"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "mcp-handler": "^1.0.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@9.4.0"
+}

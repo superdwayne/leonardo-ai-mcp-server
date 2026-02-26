@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leonardo AI MCP Server</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 720px;
+      margin: 60px auto;
+      padding: 0 20px;
+      color: #333;
+      line-height: 1.6;
+    }
+    h1 { color: #6c2bd9; }
+    code {
+      background: #f4f4f5;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    pre {
+      background: #18181b;
+      color: #e4e4e7;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    a { color: #6c2bd9; }
+    .badge {
+      display: inline-block;
+      background: #6c2bd9;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75em;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎨 Leonardo AI MCP Server <span class="badge">Remote</span></h1>
+
+  <p>A remote <a href="https://modelcontextprotocol.io">Model Context Protocol (MCP)</a> server for <a href="https://leonardo.ai">Leonardo.ai</a>, powered by <a href="https://vercel.com">Vercel</a>.</p>
+
+  <h2>Available Tools</h2>
+  <ul>
+    <li><strong>generate_image</strong> — Generate images using Leonardo AI models</li>
+    <li><strong>get_generation</strong> — Get the status and results of a generation job</li>
+    <li><strong>list_models</strong> — List available Leonardo AI platform models</li>
+    <li><strong>get_user_generations</strong> — Get recent generation jobs for the current user</li>
+    <li><strong>get_user_info</strong> — Get the current authenticated user's information</li>
+    <li><strong>create_variation</strong> — Create a variation of an existing generated image</li>
+    <li><strong>upscale_image</strong> — Upscale a generated image</li>
+    <li><strong>delete_generation</strong> — Delete a generation by ID</li>
+  </ul>
+
+  <h2>Connect via MCP</h2>
+  <p>Point your MCP client to:</p>
+  <pre><code>https://your-deployment-url.vercel.app/mcp</code></pre>
+
+  <h2>Cursor / Claude Desktop Configuration</h2>
+  <pre>{
+  "mcpServers": {
+    "leonardo-ai": {
+      "url": "https://your-deployment-url.vercel.app/mcp",
+      "headers": {
+        "x-leonardo-api-key": "YOUR_LEONARDO_API_KEY"
+      }
+    }
+  }
+}</pre>
+
+  <h2>Links</h2>
+  <ul>
+    <li><a href="https://docs.leonardo.ai">Leonardo AI Documentation</a></li>
+    <li><a href="https://github.com/vercel-labs/mcp-on-vercel">MCP on Vercel Template</a></li>
+    <li><a href="https://modelcontextprotocol.io">Model Context Protocol</a></li>
+  </ul>
+</body>
+</html>
