@@ -162,6 +162,24 @@ export async function listPlatformModels(
 }
 
 /**
+ * List a user's custom/trained models
+ */
+export async function listUserModels(
+  apiKey: string,
+  userId: string,
+): Promise<LeonardoModel[]> {
+  const data = await request(apiKey, "GET", `/models?userId=${userId}`);
+  return (data.custom_models ?? data.models ?? []).map((m: any) => ({
+    id: m.id,
+    name: m.name,
+    description: m.description ?? "",
+    nsfw: m.nsfw,
+    featured: m.featured,
+    generated_image: m.generated_image,
+  }));
+}
+
+/**
  * Create an image generation job
  */
 export async function createGeneration(

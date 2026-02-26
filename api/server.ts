@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   getUserInfo,
   listPlatformModels,
+  listUserModels,
   createGeneration,
   getGenerationById,
   getGenerationsByUserId,
@@ -86,6 +87,58 @@ const handler = createMcpHandler(
         const apiKey = extractApiKey(extra);
         try {
           const models = await listPlatformModels(apiKey);
+          const summary = models.map((m) => ({
+            id: m.id,
+            name: m.name,
+            description: m.description,
+          }));
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify(summary, null, 2),
+              },
+            ],
+          };
+        } catch (err: unknown) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: ${(err as Error).message}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      },
+    );
+
+    // ── Tool: list_custom_models ────────────────────────────────
+    server.tool(
+      "list_custom_models",
+      "List your custom/trained Leonardo AI models. Returns model IDs, names, and descriptions. Use get_user_info first to get your user ID.",
+      {
+        user_id: z
+          .string()
+          .describe(
+            "Your Leonardo AI user ID (from get_user_info)",
+          ),
+      },
+      async ({ user_id }: { user_id: string }, extra: unknown) => {
+        const apiKey = extractApiKey(extra);
+        try {
+          const models = await listUserModels(apiKey, user_id);
+          if (models.length === 0) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "No custom models found for this user. Custom models are ones you have trained/fine-tuned in Leonardo AI.",
+                },
+              ],
+            };
+          }
           const summary = models.map((m) => ({
             id: m.id,
             name: m.name,
