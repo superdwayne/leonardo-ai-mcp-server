@@ -10,6 +10,8 @@ import {
   createVariation,
   upscaleImage,
   waitForGeneration,
+  downloadImage,
+  downloadGenerationImages,
 } from "./leonardo-client.js";
 
 /**
@@ -448,6 +450,116 @@ const handler = createMcpHandler(
               },
             ],
           };
+        } catch (err: unknown) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: ${(err as Error).message}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      },
+    );
+
+    // ── Tool: download_image ────────────────────────────────────
+    server.tool(
+      "download_image",
+      "Download a Leonardo AI generated image by its URL. Returns the image as base64 data that can be saved locally. Use this after generate_image to get the actual image file.",
+      {
+        image_url: z
+          .string()
+          .url()
+          .describe("The URL of the image to download (from generate_image or get_generation results)"),
+      },
+      async ({ image_url }: { image_url: string }, _extra: unknown) => {
+        try {
+          const image = await downloadImage(image_url);
+          return {
+            content: [
+              {
+                type: "image" as const,
+                data: image.base64,
+                mimeType: image.mimeType,
+              },
+              {
+                type: "text" as const,
+                text: JSON.stringify(
+                  {
+                    filename: image.filename,
+                    mimeType: image.mimeType,
+                    url: image.url,
+                    sizeBytes: Math.round((image.base64.length * 3) / 4),
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        } catch (err: unknown) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: ${(err as Error).message}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      },
+    );
+
+    // ── Tool: download_generation ─────────────────────────────────
+    server.tool(
+      "download_generation",
+      "Download all images from a completed Leonardo AI generation. Returns each image as base64 data that can be saved locally. Provide a generation ID to download all its images at once.",
+      {
+        generation_id: z
+          .string()
+          .describe("The generation ID to download all images from"),
+      },
+      async ({ generation_id }: { generation_id: string }, extra: unknown) => {
+        const apiKey = extractApiKey(extra);
+        try {
+          const images = await downloadGenerationImages(apiKey, generation_id);
+          const content: Array<{ type: "image"; data: string; mimeType: string } | { type: "text"; text: string }> = [];
+
+          for (let i = 0; i < images.length; i++) {
+            const img = images[i];
+            content.push({
+              type: "image" as const,
+              data: img.base64,
+              mimeType: img.mimeType,
+            });
+            content.push({
+              type: "text" as const,
+              text: `Image ${i + 1}/${images.length}: ${img.filename} (${img.mimeType})`,
+            });
+          }
+
+          content.push({
+            type: "text" as const,
+            text: JSON.stringify(
+              {
+                generationId: generation_id,
+                totalImages: images.length,
+                files: images.map((img) => ({
+                  filename: img.filename,
+                  mimeType: img.mimeType,
+                  url: img.url,
+                  sizeBytes: Math.round((img.base64.length * 3) / 4),
+                })),
+              },
+              null,
+              2,
+            ),
+          });
+
+          return { content };
         } catch (err: unknown) {
           return {
             content: [

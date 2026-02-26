@@ -280,6 +280,63 @@ export async function upscaleImage(
   return data;
 }
 
+export interface DownloadedImage {
+  base64: string;
+  mimeType: string;
+  filename: string;
+  url: string;
+}
+
+/**
+ * Download an image from a URL and return it as base64
+ */
+export async function downloadImage(imageUrl: string): Promise<DownloadedImage> {
+  const res = await fetch(imageUrl);
+
+  if (!res.ok) {
+    throw new Error(`Failed to download image: ${res.status} ${res.statusText}`);
+  }
+
+  const contentType = res.headers.get("content-type") ?? "image/jpeg";
+  const buffer = await res.arrayBuffer();
+  const base64 = Buffer.from(buffer).toString("base64");
+
+  // Extract filename from URL
+  const urlPath = new URL(imageUrl).pathname;
+  const filename = urlPath.split("/").pop() ?? "image.jpg";
+
+  return {
+    base64,
+    mimeType: contentType,
+    filename,
+    url: imageUrl,
+  };
+}
+
+/**
+ * Download all images from a generation
+ */
+export async function downloadGenerationImages(
+  apiKey: string,
+  generationId: string,
+): Promise<DownloadedImage[]> {
+  const generation = await getGenerationById(apiKey, generationId);
+
+  if (generation.status !== "COMPLETE") {
+    throw new Error(`Generation ${generationId} is not complete (status: ${generation.status})`);
+  }
+
+  if (!generation.generated_images?.length) {
+    throw new Error(`Generation ${generationId} has no images`);
+  }
+
+  const downloads = await Promise.all(
+    generation.generated_images.map((img) => downloadImage(img.url)),
+  );
+
+  return downloads;
+}
+
 /**
  * Poll a generation until it completes or fails (max wait)
  */
