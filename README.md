@@ -21,9 +21,7 @@ Generate images, manage models, check generation status, upscale, create variati
 
 ### One-Click Deploy
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FYOUR_USERNAME%2Fleonardo-ai-mcp-server&env=LEONARDO_API_KEY&envDescription=Your%20Leonardo%20AI%20API%20key&project-name=leonardo-ai-mcp-server)
-
-> Replace `YOUR_USERNAME` with your GitHub username after pushing.
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fsuperdwayne%2Fleonardo-ai-mcp-server&env=LEONARDO_API_KEY&envDescription=Your%20Leonardo%20AI%20API%20key&project-name=leonardo-ai-mcp-server)
 
 ### Manual Deploy
 
