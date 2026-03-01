@@ -275,26 +275,54 @@ const handler = createMcpHandler(
               (img) => img.url,
             );
 
-            return {
-              content: [
+            // Build content array with inline images + metadata
+            const content: Array<
+              | { type: "image"; data: string; mimeType: string }
+              | { type: "text"; text: string }
+            > = [];
+
+            // Download and embed each image inline so it renders in the chat
+            if (
+              generation.status === "COMPLETE" &&
+              generation.generated_images?.length
+            ) {
+              for (const img of generation.generated_images) {
+                try {
+                  const downloaded = await downloadImage(img.url, true);
+                  content.push({
+                    type: "image" as const,
+                    data: downloaded.base64,
+                    mimeType: downloaded.mimeType,
+                  });
+                } catch {
+                  // If download fails, fall back to URL-only for this image
+                  content.push({
+                    type: "text" as const,
+                    text: `[Image download failed – view at: ${img.url}]`,
+                  });
+                }
+              }
+            }
+
+            // Append metadata as text
+            content.push({
+              type: "text" as const,
+              text: JSON.stringify(
                 {
-                  type: "text" as const,
-                  text: JSON.stringify(
-                    {
-                      generationId: generation.id,
-                      status: generation.status,
-                      prompt: generation.prompt,
-                      images: imageUrls ?? [],
-                      imageDetails: generation.generated_images ?? [],
-                      width: generation.width,
-                      height: generation.height,
-                    },
-                    null,
-                    2,
-                  ),
+                  generationId: generation.id,
+                  status: generation.status,
+                  prompt: generation.prompt,
+                  images: imageUrls ?? [],
+                  imageDetails: generation.generated_images ?? [],
+                  width: generation.width,
+                  height: generation.height,
                 },
-              ],
-            };
+                null,
+                2,
+              ),
+            });
+
+            return { content };
           }
 
           return {
@@ -342,14 +370,40 @@ const handler = createMcpHandler(
         const apiKey = extractApiKey(extra);
         try {
           const generation = await getGenerationById(apiKey, generation_id);
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: JSON.stringify(generation, null, 2),
-              },
-            ],
-          };
+
+          const content: Array<
+            | { type: "image"; data: string; mimeType: string }
+            | { type: "text"; text: string }
+          > = [];
+
+          // If generation is complete, download and embed images inline
+          if (
+            generation.status === "COMPLETE" &&
+            generation.generated_images?.length
+          ) {
+            for (const img of generation.generated_images) {
+              try {
+                const downloaded = await downloadImage(img.url, true);
+                content.push({
+                  type: "image" as const,
+                  data: downloaded.base64,
+                  mimeType: downloaded.mimeType,
+                });
+              } catch {
+                content.push({
+                  type: "text" as const,
+                  text: `[Image download failed – view at: ${img.url}]`,
+                });
+              }
+            }
+          }
+
+          content.push({
+            type: "text" as const,
+            text: JSON.stringify(generation, null, 2),
+          });
+
+          return { content };
         } catch (err: unknown) {
           return {
             content: [
